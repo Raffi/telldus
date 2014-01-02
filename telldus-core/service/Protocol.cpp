@@ -10,6 +10,7 @@
 #include <string>
 
 #include "client/telldus-core.h"
+//#include "service/Log.h"
 #include "service/ControllerMessage.h"
 #include "service/ProtocolBrateck.h"
 #include "service/ProtocolComen.h"
@@ -218,6 +219,9 @@ std::list<std::string> Protocol::decodeData(const std::string &fullData) {
 	std::string decoded = "";
 
 	ControllerMessage dataMsg(fullData);
+//	std::wstring protocol = dataMsg.protocol();
+//	std::wstring model = dataMsg.model();
+//	Log::notice("telldusd protocol: %ls, model: %ls", protocol.c_str(), model.c_str());
 	if( TelldusCore::comparei(dataMsg.protocol(), L"arctech") ) {
 		decoded = ProtocolNexa::decodeData(dataMsg);
 		if (decoded != "") {

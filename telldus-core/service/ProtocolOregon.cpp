@@ -5,6 +5,7 @@
 //
 //
 #include "service/ProtocolOregon.h"
+//#include "service/Log.h"
 #include <stdlib.h>
 #include <iomanip>
 #include <sstream>
@@ -13,12 +14,14 @@
 
 std::string ProtocolOregon::decodeData(const ControllerMessage &dataMsg) {
 	std::string data = dataMsg.getParameter("data");
-
+//	Log::notice("telldusd data length: %d, data: %s",data.length(),data.c_str());
 	std::wstring model = dataMsg.model();
 	if (model.compare(L"0xEA4C") == 0) {
 		return decodeEA4C(data);
 	} else if (model.compare(L"0x1A2D") == 0) {
 		return decode1A2D(data);
+        } else if (model.compare(L"0x1A3D") == 0) {
+                return decode1A3D(data);
 	} else if (model.compare(L"0xF824") == 0) {
 		return decodeF824(data);
 	} else if (model.compare(L"0x1984") == 0 || model.compare(L"0x1994") == 0) {
@@ -193,6 +196,62 @@ std::string ProtocolOregon::decode1A2D(const std::string &data) {
 		<< ";humidity:" << humidity << ";";
 
 	return retString.str();
+}
+
+std::string ProtocolOregon::decode1A3D(const std::string &data) {
+        uint64_t value = TelldusCore::hexTo64l(data);
+        // checksum2 not used yet
+        // uint8_t checksum2 = value & 0xFF;
+        value >>= 8;
+        uint8_t checksum1 = value & 0xFF;
+        value >>= 8;
+
+        uint8_t checksum = ((value >> 4) & 0xF) + (value & 0xF);
+	uint8_t hum1 = value & 0xF;
+        value >>= 8;
+
+        checksum += ((value >> 4) & 0xF) + (value & 0xF);
+        uint8_t neg = value & (1 << 3);
+        uint8_t hum2 = (value >> 4) & 0xF;
+        value >>= 8;
+
+        checksum += ((value >> 4) & 0xF) + (value & 0xF);
+        uint8_t temp2 = value & 0xF;
+        uint8_t temp1 = (value >> 4) & 0xF;
+        value >>= 8;
+
+        checksum += ((value >> 4) & 0xF) + (value & 0xF);
+	uint8_t battery = value & (1 << 2);
+        uint8_t temp3 = (value >> 4) & 0xF;
+        value >>= 8;
+
+        checksum += ((value >> 4) & 0xF) + (value & 0xF);
+        uint8_t address = value & 0xFF;
+        value >>= 8;
+
+        checksum += ((value >> 4) & 0xF) + (value & 0xF);
+        // channel not used
+        // uint8_t channel = (value >> 4) & 0x7;
+
+        checksum += 0x1 + 0xA + 0x3 + 0xD - 0xA;
+
+        // TODO(micke): Find out how checksum2 works
+	if (checksum != checksum1) {
+              return "";
+	}
+
+        double temperature = ((temp1 * 100) + (temp2 * 10) + temp3)/10.0;
+        if (neg) {
+                temperature = -temperature;
+        }
+        int humidity = (hum1 * 10.0) + hum2;
+
+        std::stringstream retString;
+        retString << "class:sensor;protocol:oregon;model:1A3D;id:" << static_cast<int>(address)
+                << ";temp:" << std::fixed << std::setprecision(1) << temperature
+                << ";humidity:" << humidity << ";";
+
+        return retString.str();
 }
 
 std::string ProtocolOregon::decode2914(const std::string &data) {
